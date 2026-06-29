@@ -2,12 +2,12 @@ default rel
 
 section .data
   outname db "bfc-out.s", 0
-  loop_count db 0
-  stack_ptr db 0
+  loop_count dq 0
+  stack_ptr dq 0
 
   header db "default rel", 10, 10, \
             "section .data", 10, \
-            " cursor db 0", 10, 10, \
+            " cursor dw 0", 10, 10, \
             "section .bss", 10, \
             " memory resb 30000", 10, \
             " tmp resb 1", 10, 10, \
@@ -23,26 +23,26 @@ section .data
   
   footer_len equ $ - footer - 1 
   
-  cursor_right_asm db " add byte [cursor], 1 ; '>'", 10, 10, 0 
+  cursor_right_asm db " add word [cursor], 1 ; '>'", 10, 10, 0 
   cursor_right_len equ $ - cursor_right_asm - 1 
 
-  cursor_left_asm db " sub byte [cursor], 1 ; '<'", 10, 10, 0 
+  cursor_left_asm db " sub word [cursor], 1 ; '<'", 10, 10, 0 
   cursor_left_len equ $ - cursor_left_asm - 1
 
   inc_cell_asm db " ; '+'", 10, \
-                  " movzx rbx, byte [cursor]", 10, \
+                  " movzx rbx, word [cursor]", 10, \
                   " inc byte [memory + rbx] ; '+'", 10, 10, 0
 
   inc_cell_len equ $ - inc_cell_asm - 1
 
   sub_cell_asm db " ; '-'", 10, \
-                  " movzx rbx, byte [cursor]", 10, \
+                  " movzx rbx, word [cursor]", 10, \
                   " dec byte [memory + rbx] ; '-'", 10, 10, 0
 
   sub_cell_len equ $ - sub_cell_asm - 1 
 
   print_cell_asm db " ; '.'", 10, \
-                    " movzx rbx, byte [cursor]", 10, \
+                    " movzx rbx, word [cursor]", 10, \
                     " mov al, byte [memory + rbx]", 10, \
                     " mov [tmp], al", 10, \
                     " mov rax, 1 ; sys_write", 10, \
@@ -54,7 +54,7 @@ section .data
   print_cell_len equ $ - print_cell_asm - 1
 
   read_byte_asm db  " ; ','", 10, \
-                    " movzx rbx, byte [cursor]", 10, \
+                    " movzx rbx, word [cursor]", 10, \
                     " lea rsi, [memory + rbx]", 10, \
                     " mov rax, 0 ; sys_read", 10, \
                     " mov rdi, 0 ; stdin", 10, \
@@ -68,7 +68,7 @@ section .data
   loop_start_template_len equ $ - loop_start_template - 1 
 
   loop_start_center db ":", 10, \
-                       "  movzx rbx, byte [cursor]", 10, \
+                       "  movzx rbx, word [cursor]", 10, \
                        "  mov al, byte [memory + rbx]", 10, \
                        "  test al, al", 10, \
                        "  jz loop_end_", 0
@@ -76,7 +76,7 @@ section .data
   loop_start_center_len equ $ - loop_start_center - 1
 
   loop_end_header db  " ; ']'", 10, \
-                        " movzx rbx, byte [cursor]", 10, \
+                        " movzx rbx, word [cursor]", 10, \
                         " cmp byte [memory + rbx], 0", 10, \
                         " jne loop_start_", 0
   
@@ -96,7 +96,7 @@ section .bss
   
   tmp resb 1 
 
-  stack resb 100
+  stack resq 100
 
   utoa_buf resb 4096
 
@@ -165,8 +165,6 @@ compile_file: ; rdi = fd | rax = 0/1 success code
   syscall
 
   .compile_loop:
-    xor r8, r8 ; index 
-
     mov rdi, [passedfd]
     call read_chunk
 
@@ -229,7 +227,7 @@ compile_chunk: ; rdi = bytes to read
   
   .loop:
     cmp [bytes_to_compile], r10 
-    je .end
+    je .chunk_end
     
     mov cl, [chunk + r10]
     mov [tmp], cl 
@@ -306,11 +304,11 @@ compile_chunk: ; rdi = bytes to read
     push rbx ; rbx is callee saved  
 
     ; stack[sp++] = ++loop_count
-    inc byte [loop_count]
-    movzx rbx, byte [stack_ptr]
-    mov al, [loop_count]
-    mov [stack + rbx], al 
-    inc byte [stack_ptr]
+    inc qword [loop_count]
+    mov rbx, [stack_ptr]
+    mov rax, [loop_count]
+    mov [stack + rbx * 8], rax  
+    inc qword [stack_ptr]
 
     pop rbx 
     
@@ -321,9 +319,9 @@ compile_chunk: ; rdi = bytes to read
     push rbx 
     
     ; rax = stack[sp - 1]
-    movzx rbx, byte [stack_ptr]
+    mov rbx, [stack_ptr]
     dec rbx 
-    movzx rax, byte [stack + rbx]
+    mov rax, [stack + rbx * 8]
 
     pop rbx 
 
@@ -371,9 +369,9 @@ compile_chunk: ; rdi = bytes to read
     push rbx 
     
     ; rax = stack[sp - 1]
-    movzx rbx, byte [stack_ptr]
+    mov rbx, [stack_ptr]
     dec rbx 
-    movzx rax, byte [stack + rbx]
+    mov rax, [stack + rbx * 8]
 
     pop rbx 
 
@@ -397,9 +395,9 @@ compile_chunk: ; rdi = bytes to read
     push rbx ; rbx is callee saved  
 
     ; rdi = stack[--sp]
-    dec byte [stack_ptr]
-    movzx rbx, byte [stack_ptr] 
-    movzx rdi, byte [stack + rbx]
+    dec qword [stack_ptr]
+    mov rbx, [stack_ptr] 
+    mov rdi, [stack + rbx * 8]
 
     pop rbx 
 
@@ -429,7 +427,7 @@ compile_chunk: ; rdi = bytes to read
     inc r10
     jmp .loop 
 
-  .end:
+  .chunk_end:
     ret 
 
 writebuf: ; rsi = string | rcx = length
@@ -447,7 +445,7 @@ writebuf: ; rsi = string | rcx = length
     mov rax, 1 
     mov rdi, [outfd]
     mov rsi, compiled_buf
-    mov rdx, 4095
+    mov rdx, [bytes_to_write]
     
     syscall 
   

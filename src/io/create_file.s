@@ -8,7 +8,7 @@ section .text
 
 create_file: ; rdi = filename | rax = fd || errcode
   mov rax, 2 
-  mov rsi, 0x41 ; O_CREAT | O_WRONLY 
+  mov rsi, 0x241 ; O_CREAT | O_WRONLY | O_TRUNC 
   mov rdx, 0644q
 
   syscall

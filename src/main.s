@@ -79,7 +79,7 @@ parseargs:
   mov rbp, rsp 
 
   mov r8, 1 ; index 
-  xor r9, r9 ; positonals 
+  xor r9, r9 ; positionals 
 
   .loop:
     cmp r8, [argc]
