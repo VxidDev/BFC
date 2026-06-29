@@ -1,6 +1,8 @@
 # Prerequisites
 *.d
 bfc-out
+bfc-out.s 
+bfc
 
 # Object files
 *.o
