@@ -5,6 +5,8 @@ section .rodata
   arg_overflow_s2 db "'", 0xA, 0
 
   filename_expected db "BFC: filename expected.", 0xA, 0
+  
+  open_fail db "BFC: failed to open file.", 0xA, 0
 
 section .bss 
   argc resq 1 
@@ -19,6 +21,8 @@ section .text
   extern strcmp
   extern prints
   extern printnl
+  extern open_file_rdonly
+  extern compile_file
 
 _start:
   mov rax, [rsp] ; argc 
@@ -32,29 +36,42 @@ _start:
 
   call parseargs
   
-  mov r8, [filename]
-  test r8, r8
-  jnz .printfname
+  mov rdi, [filename]
+  test rdi, rdi
+  jnz .continue
   
   mov rdi, filename_expected
   call prints 
-
+  
   mov rsp, rbp
   pop rbp 
 
   mov rdi, 1 
   call sys_exit
 
-  .printfname:
-    mov rdi, [filename] 
-    call prints
-  
-    call printnl
+  .continue:
+
+  call open_file_rdonly
+  cmp rax, 0
+  jge .compile 
+
+  mov rdi, open_fail
+  call prints
 
   mov rsp, rbp 
   pop rbp 
 
-  xor rdi, rdi 
+  call sys_exit
+
+  .compile: 
+  mov rdi, rax
+  call compile_file
+  
+  mov rdi, rax 
+
+  mov rsp, rbp 
+  pop rbp 
+
   call sys_exit
 
 parseargs: 
