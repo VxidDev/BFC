@@ -6,14 +6,12 @@ section .data
   stack_ptr dq 0
 
   header db "default rel", 10, 10, \
-            "section .data", 10, \
-            " cursor dw 0", 10, 10, \
             "section .bss", 10, \
-            " memory resb 30000", 10, \
-            " tmp resb 1", 10, 10, \
+            " memory resb 30000", 10, 10, \
             "section .text", 10, \
             " global _start", 10, 10, \
-            "_start: ", 10, 0
+            "_start: ", 10, \
+            " lea r12, [memory]", 10, 0
 
   header_len equ $ - header - 1
   
@@ -23,41 +21,31 @@ section .data
   
   footer_len equ $ - footer - 1 
   
-  cursor_right_asm db " add word [cursor], 1 ; '>'", 10, 10, 0 
+  cursor_right_asm db " inc r12 ; '>'", 10, 10, 0 
   cursor_right_len equ $ - cursor_right_asm - 1 
 
-  cursor_left_asm db " sub word [cursor], 1 ; '<'", 10, 10, 0 
+  cursor_left_asm db " dec r12 ; '<'", 10, 10, 0 
   cursor_left_len equ $ - cursor_left_asm - 1
 
-  inc_cell_asm db " ; '+'", 10, \
-                  " movzx rbx, word [cursor]", 10, \
-                  " inc byte [memory + rbx] ; '+'", 10, 10, 0
-
+  inc_cell_asm db " inc byte [r12] ; '+'", 10, 10, 0
   inc_cell_len equ $ - inc_cell_asm - 1
 
-  sub_cell_asm db " ; '-'", 10, \
-                  " movzx rbx, word [cursor]", 10, \
-                  " dec byte [memory + rbx] ; '-'", 10, 10, 0
-
+  sub_cell_asm db " dec byte [r12] ; '-'", 10, 10, 0
   sub_cell_len equ $ - sub_cell_asm - 1 
 
   print_cell_asm db " ; '.'", 10, \
-                    " movzx rbx, word [cursor]", 10, \
-                    " mov al, byte [memory + rbx]", 10, \
-                    " mov [tmp], al", 10, \
                     " mov rax, 1 ; sys_write", 10, \
                     " mov rdi, 1 ; stdout", 10, \
-                    " mov rsi, tmp ; cell", 10, \
+                    " mov rsi, r12 ; cell", 10, \
                     " mov rdx, 1", 10, \
                     " syscall", 10, 10, 0
 
   print_cell_len equ $ - print_cell_asm - 1
 
   read_byte_asm db  " ; ','", 10, \
-                    " movzx rbx, word [cursor]", 10, \
-                    " lea rsi, [memory + rbx]", 10, \
                     " mov rax, 0 ; sys_read", 10, \
                     " mov rdi, 0 ; stdin", 10, \
+                    " mov rsi, r12", 10, \
                     " mov rdx, 1", 10, \
                     " syscall", 10, 10, 0 
 
@@ -68,16 +56,13 @@ section .data
   loop_start_template_len equ $ - loop_start_template - 1 
 
   loop_start_center db ":", 10, \
-                       "  movzx rbx, word [cursor]", 10, \
-                       "  mov al, byte [memory + rbx]", 10, \
-                       "  test al, al", 10, \
+                       "  cmp byte [r12], 0", 10, \
                        "  jz loop_end_", 0
   
   loop_start_center_len equ $ - loop_start_center - 1
 
   loop_end_header db  " ; ']'", 10, \
-                        " movzx rbx, word [cursor]", 10, \
-                        " cmp byte [memory + rbx], 0", 10, \
+                        " cmp byte [r12], 0", 10, \
                         " jne loop_start_", 0
   
   loop_end_header_len equ $ - loop_end_header - 1
