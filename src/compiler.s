@@ -21,17 +21,25 @@ section .data
   
   footer_len equ $ - footer - 1 
   
-  cursor_right_asm db " inc r12 ; '>'", 10, 10, 0 
-  cursor_right_len equ $ - cursor_right_asm - 1 
+  cursor_right_template db  " ; '>'", 10, \
+                            " add r12, ", 0
 
-  cursor_left_asm db " dec r12 ; '<'", 10, 10, 0 
-  cursor_left_len equ $ - cursor_left_asm - 1
+  cursor_right_template_len equ $ - cursor_right_template - 1 
 
-  inc_cell_asm db " inc byte [r12] ; '+'", 10, 10, 0
-  inc_cell_len equ $ - inc_cell_asm - 1
+  cursor_left_template db " ; '<'", 10, \
+                          " sub r12, ", 0
 
-  sub_cell_asm db " dec byte [r12] ; '-'", 10, 10, 0
-  sub_cell_len equ $ - sub_cell_asm - 1 
+  cursor_left_template_len equ $ - cursor_left_template - 1
+
+  add_cell_template db  " ; '+'", 10, \
+                        " add byte [r12], ", 0
+
+  add_cell_template_len equ $ - add_cell_template - 1
+
+  sub_cell_template db " ; '-'", 10, \
+                       " sub byte [r12], ", 0
+
+  sub_cell_template_len equ $ - sub_cell_template - 1 
 
   print_cell_asm db " ; '.'", 10, \
                     " mov rax, 1 ; sys_write", 10, \
@@ -69,6 +77,11 @@ section .data
 
   loop_end_template db 10, 10, " loop_end_", 0
   loop_end_template_len equ $ - loop_end_template - 1
+
+  clear_cell_template db  " ; '[-]' / '[+]'", 10, \
+                          " mov byte [r12], 0", 10, 10, 0
+
+  clear_cell_template_len equ $ - clear_cell_template - 1
 
 section .bss 
   passedfd resd 1 
@@ -224,7 +237,7 @@ compile_chunk: ; rdi = bytes to read
     je .cursor_left
 
     cmp cl, '+'
-    je .inc_cell
+    je .add_cell
 
     cmp cl, '-'
     je .sub_cell
@@ -244,30 +257,169 @@ compile_chunk: ; rdi = bytes to read
     jmp .continue
 
   .cursor_right:
-    mov rsi, cursor_right_asm
-    mov rcx, cursor_right_len
-    call writebuf
+    xor rbx, rbx 
+    
+    .count_right:
+      cmp r10, [bytes_to_compile]
+      jge .right_done 
+
+      cmp byte [chunk + r10], '>'
+      jne .right_done 
+
+      inc rbx 
+      inc r10 
+
+      jmp .count_right  
+
+    .right_done:
+      mov rsi, cursor_right_template 
+      mov rcx, cursor_right_template_len 
+      call writebuf
+
+      mov rdi, rbx 
+      call utoa 
+      lea rsi, [utoa_buf + 4096]
+      sub rsi, rax 
+      mov rcx, rax 
+
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+    
+    dec r10 
 
     jmp .continue
 
   .cursor_left:
-    mov rsi, cursor_left_asm 
-    mov rcx, cursor_left_len
-    call writebuf
+    xor rbx, rbx 
+    
+    .count_left:
+      cmp r10, [bytes_to_compile]
+      jge .left_done 
+
+      cmp byte [chunk + r10], '<'
+      jne .left_done 
+
+      inc rbx 
+      inc r10 
+
+      jmp .count_left  
+
+    .left_done:
+      mov rsi, cursor_left_template 
+      mov rcx, cursor_left_template_len 
+      call writebuf
+
+      mov rdi, rbx 
+      call utoa 
+      lea rsi, [utoa_buf + 4096]
+      sub rsi, rax 
+      mov rcx, rax 
+
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+    
+    dec r10 
 
     jmp .continue
 
-  .inc_cell:
-    mov rsi, inc_cell_asm
-    mov rcx, inc_cell_len 
-    call writebuf
+  .add_cell:
+    xor rbx, rbx 
+    
+    .count_plus:
+      cmp r10, [bytes_to_compile]
+      jge .plus_done 
 
+      cmp byte [chunk + r10], '+'
+      jne .plus_done 
+
+      inc rbx 
+      inc r10 
+
+      jmp .count_plus
+
+    .plus_done:
+      mov rsi, add_cell_template
+      mov rcx, add_cell_template_len 
+      call writebuf
+
+      mov rdi, rbx 
+      call utoa 
+      lea rsi, [utoa_buf + 4096]
+      sub rsi, rax 
+      mov rcx, rax 
+
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+    
+    dec r10 
     jmp .continue
 
   .sub_cell:
-    mov rsi, sub_cell_asm 
-    mov rcx, sub_cell_len
-    call writebuf
+    xor rbx, rbx 
+    
+    .count_minus:
+      cmp r10, [bytes_to_compile]
+      jge .minus_done 
+
+      cmp byte [chunk + r10], '-'
+      jne .minus_done 
+
+      inc rbx 
+      inc r10 
+
+      jmp .count_minus 
+
+    .minus_done:
+      mov rsi, sub_cell_template 
+      mov rcx, sub_cell_template_len 
+      call writebuf
+
+      mov rdi, rbx 
+      call utoa 
+      lea rsi, [utoa_buf + 4096]
+      sub rsi, rax 
+      mov rcx, rax 
+
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+
+      mov byte [tmp], 0xA
+      mov rsi, tmp
+      mov rcx, 1 
+      call writebuf
+    
+    dec r10 
 
     jmp .continue
 
@@ -286,6 +438,39 @@ compile_chunk: ; rdi = bytes to read
     jmp .continue
   
   .loop_start:
+    mov rax, r10 
+    add rax, 3
+    cmp rax, [bytes_to_compile]
+    jg .no_optimizations
+    
+    cmp byte [chunk + r10 + 1], '-'
+    je .check_close_minus
+    
+    cmp byte [chunk + r10 + 1], '+'
+    je .check_close_plus
+
+    jmp .no_optimizations
+
+    .check_close_minus:
+      cmp byte [chunk + r10 + 2], ']'
+      jne .no_optimizations
+      jmp .emit_clear_cell
+
+    .check_close_plus:
+      cmp byte [chunk + r10 + 2], ']'
+      jne .no_optimizations
+      jmp .emit_clear_cell
+
+    .emit_clear_cell:
+      mov rsi, clear_cell_template
+      mov rcx, clear_cell_template_len 
+      call writebuf
+
+      add r10, 2
+      jmp .continue
+
+    .no_optimizations:
+ 
     push rbx ; rbx is callee saved  
 
     ; stack[sp++] = ++loop_count
