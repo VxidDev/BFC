@@ -75,10 +75,25 @@ Hello World!
 
 ```text
 .
-├── bfc
 ├── hello-world.bf
-├── bfc-out.s
-└── ...
+├── LICENSE
+├── makefile
+├── README.md
+└── src
+    ├── compiler.s
+    ├── io
+    │   ├── create_file.s
+    │   ├── open_file.s
+    │   ├── printnl.s
+    │   ├── prints.s
+    │   └── read_chunk.s
+    ├── main.s
+    ├── string
+    │   ├── strcmp.s
+    │   └── strlen.s
+    └── syscalls
+        ├── sys_exit.s
+        └── sys_open.s
 ```
 
 ## Future Improvements
